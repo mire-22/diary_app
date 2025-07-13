@@ -1,0 +1,91 @@
+# ===== 環境・設定ファイル =====
+.env
+.env.local
+.env.production
+.env.development
+
+# Streamlit設定
+.streamlit/secrets.toml
+.streamlit/config.toml
+
+# ===== データファイル（プライバシー保護） =====
+# 日記データベース
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+
+# キャッシュ・一時データ
+data/*.json
+data/*.csv
+data/cache/
+data/backup/
+data/temp/
+
+# ただし、サンプルデータは除外
+!data/example_usage.db
+
+# ===== Python関連 =====
+# バイトコード
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# 配布・パッケージング
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 仮想環境
+venv/
+env/
+ENV/
+.venv/
+.env/
+
+# テスト
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# ===== IDE・エディタ =====
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ===== OS関連 =====
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ===== ログ・一時ファイル =====
+*.log
+logs/
+*.tmp
+*.temp
+
+# ===== その他 =====
+# 一時的な分析結果
+outputs/
+results/
