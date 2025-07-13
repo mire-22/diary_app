@@ -4,8 +4,12 @@ import re
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from typing import List, Dict
-from ..ai_analyzer import AIAnalyzer
+from typing import List, Dict, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import sys
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from ai_analyzer import AIAnalyzer
 
 # 分類カテゴリ（固定）
 CATEGORIES = [
@@ -39,7 +43,7 @@ def extract_emotions_with_date(data_dir: str) -> List[Dict[str, str]]:
 # -----------------------
 def classify_emotions_with_llm(emotion_records: List[Dict[str, str]],
                                 categories: List[str],
-                                ai_analyzer: AIAnalyzer,
+                                ai_analyzer: 'AIAnalyzer',
                                 use_cache: bool = True,
                                 cache_path: str = "data/emotion_classification_cache.json") -> Dict[str, Dict[str, str]]:
     """emotionリストをLLMで7分類に分ける（日付情報も保持）"""

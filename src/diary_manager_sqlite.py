@@ -2,6 +2,8 @@ import sqlite3
 import json
 import uuid
 import datetime
+import hashlib
+import os
 from typing import Any, Optional
 
 class DiaryManagerSQLite:
@@ -89,6 +91,17 @@ class DiaryManagerSQLite:
                     created_at TEXT,
                     order_index INTEGER,
                     FOREIGN KEY (diary_entry_id) REFERENCES diary_entries (id)
+                )
+            ''')
+            
+            # ユーザー管理テーブルを作成
+            cur.execute('''
+                CREATE TABLE IF NOT EXISTS users (
+                    id TEXT PRIMARY KEY,
+                    username TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    last_login TEXT
                 )
             ''')
             
@@ -659,7 +672,7 @@ class DiaryManagerSQLite:
             cur.execute('DELETE FROM qa_chain WHERE diary_entry_id = ?', (uuid_id,))
             
             # 新しい関連データを挿入
-            self._insert_related_data(cur, uuid_id, updated_data)
+            self._upsert_related_data(cur, uuid_id, updated_data)
             
             conn.commit()
             return True
@@ -667,5 +680,155 @@ class DiaryManagerSQLite:
         except Exception as e:
             conn.rollback()
             raise e
+        finally:
+            conn.close()
+    
+    # ===== ユーザー認証機能 =====
+    
+    def _hash_password(self, password: str) -> str:
+        """パスワードをハッシュ化"""
+        salt = os.urandom(32)
+        key = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000)
+        return salt.hex() + key.hex()
+    
+    def _verify_password(self, password: str, hashed: str) -> bool:
+        """パスワードを検証"""
+        try:
+            salt = bytes.fromhex(hashed[:64])
+            key = bytes.fromhex(hashed[64:])
+            new_key = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000)
+            return key == new_key
+        except:
+            return False
+    
+    def create_user(self, username: str, password: str) -> bool:
+        """新規ユーザーを作成"""
+        conn = sqlite3.connect(self.db_path)
+        cur = conn.cursor()
+        
+        try:
+            # ユーザー名の重複チェック
+            cur.execute('SELECT id FROM users WHERE username = ?', (username,))
+            if cur.fetchone():
+                return False
+            
+            # パスワードをハッシュ化
+            password_hash = self._hash_password(password)
+            user_id = str(uuid.uuid4())
+            
+            # ユーザーを作成
+            cur.execute('''
+                INSERT INTO users (id, username, password_hash)
+                VALUES (?, ?, ?)
+            ''', (user_id, username, password_hash))
+            
+            conn.commit()
+            return True
+            
+        except Exception as e:
+            conn.rollback()
+            print(f"ユーザー作成エラー: {e}")
+            return False
+        finally:
+            conn.close()
+    
+    def authenticate_user(self, username: str, password: str) -> Optional[str]:
+        """ユーザー認証"""
+        conn = sqlite3.connect(self.db_path)
+        cur = conn.cursor()
+        
+        try:
+            # ユーザー情報を取得
+            cur.execute('SELECT id, password_hash FROM users WHERE username = ?', (username,))
+            result = cur.fetchone()
+            
+            if not result:
+                return None
+            
+            user_id, password_hash = result
+            
+            # パスワードを検証
+            if self._verify_password(password, password_hash):
+                # 最終ログイン時刻を更新
+                cur.execute('''
+                    UPDATE users SET last_login = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                ''', (user_id,))
+                conn.commit()
+                return user_id
+            
+            return None
+            
+        except Exception as e:
+            print(f"認証エラー: {e}")
+            return None
+        finally:
+            conn.close()
+    
+    def get_user_by_id(self, user_id: str) -> Optional[dict]:
+        """ユーザーIDからユーザー情報を取得"""
+        conn = sqlite3.connect(self.db_path)
+        cur = conn.cursor()
+        
+        try:
+            cur.execute('''
+                SELECT id, username, created_at, last_login
+                FROM users WHERE id = ?
+            ''', (user_id,))
+            
+            result = cur.fetchone()
+            if result:
+                return {
+                    'id': result[0],
+                    'username': result[1],
+                    'created_at': result[2],
+                    'last_login': result[3]
+                }
+            return None
+            
+        except Exception as e:
+            print(f"ユーザー取得エラー: {e}")
+            return None
+        finally:
+            conn.close()
+    
+    def get_user_diary_data(self, user_id: str) -> list[dict[str, Any]]:
+        """特定ユーザーの日記データを取得"""
+        conn = sqlite3.connect(self.db_path)
+        cur = conn.cursor()
+        
+        try:
+            # ユーザーの日記エントリを取得
+            cur.execute('''
+                SELECT id, original_id, created_at, date, text, question
+                FROM diary_entries 
+                WHERE user_id = ?
+                ORDER BY created_at DESC
+            ''', (user_id,))
+            
+            entries = []
+            for row in cur.fetchall():
+                entry = {
+                    'id': row[0],
+                    'original_id': row[1],
+                    'created_at': row[2],
+                    'date': row[3],
+                    'text': row[4],
+                    'question': row[5],
+                    'user_id': user_id,
+                    'topics': self._get_topics(cur, row[0]),
+                    'emotions': self._get_emotions(cur, row[0]),
+                    'thoughts': self._get_thoughts(cur, row[0]),
+                    'goals': self._get_goals(cur, row[0]),
+                    'followup_questions': self._get_followup_questions(cur, row[0]),
+                    'qa_chain': self._get_qa_chain(cur, row[0])
+                }
+                entries.append(entry)
+            
+            return entries
+            
+        except Exception as e:
+            print(f"ユーザーデータ取得エラー: {e}")
+            return []
         finally:
             conn.close() 

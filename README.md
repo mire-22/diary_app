@@ -65,7 +65,7 @@ pip install -r requirements.txt
 ```bash
 # 推奨: プロジェクトルートから
 python run_app.py
-# または
+# または直接
 streamlit run src/diary_app.py
 ```
 

@@ -4,7 +4,11 @@ from typing import Dict, Any
 class PromptManager:
     """プロンプトファイルを管理するクラス"""
     
-    def __init__(self, prompts_dir: str = "src/prompts"):
+    def __init__(self, prompts_dir: str = None):
+        if prompts_dir is None:
+            # 現在のファイルの場所を基準にプロンプトディレクトリを設定
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            prompts_dir = os.path.join(os.path.dirname(current_dir), "prompts")
         self.prompts_dir = prompts_dir
         self._prompts_cache = {}
     

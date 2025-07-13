@@ -1,9 +1,12 @@
 import streamlit as st
 from typing import Dict, Any, List
-from .diary_manager_sqlite import DiaryManagerSQLite
-from .ai_analyzer import AIAnalyzer
-from .period_analyzer import PeriodAnalyzer
 import datetime
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from diary_manager_sqlite import DiaryManagerSQLite
+from ai_analyzer import AIAnalyzer
+from period_analyzer import PeriodAnalyzer
 
 class UIComponents:
     """UIコンポーネントクラス"""
@@ -12,6 +15,13 @@ class UIComponents:
         self.diary_manager = diary_manager
         self.ai_analyzer = ai_analyzer
         self.period_analyzer = period_analyzer if period_analyzer else PeriodAnalyzer(ai_analyzer)
+    
+    def _get_user_diary_data(self, user_id: str = None):
+        """ユーザー別の日記データを取得"""
+        if user_id and user_id != "guest":
+            return self.diary_manager.get_user_diary_data(user_id)
+        else:
+            return self.diary_manager.get_all_diary_data()
     
     def show_home(self) -> None:
         """ホーム画面を表示"""
@@ -50,7 +60,8 @@ class UIComponents:
         
         # 最近の日記を表示
         st.markdown("### 📅 最近の日記")
-        diary_data = self.diary_manager.get_all_diary_data()
+        user_id = st.session_state.get('user_id')
+        diary_data = self._get_user_diary_data(user_id)
         if diary_data:
             recent_entries = sorted(diary_data, key=lambda x: x.get('created_at', ''), reverse=True)[:3]
             for entry in recent_entries:
@@ -89,6 +100,10 @@ class UIComponents:
                 diary_entry = self.ai_analyzer.create_diary_entry(diary_input)
                 # 選択された日付を設定
                 diary_entry['date'] = selected_date.strftime('%Y-%m-%d')
+                # ユーザーIDを設定
+                user_id = st.session_state.get('user_id')
+                if user_id and user_id != "guest":
+                    diary_entry['user_id'] = user_id
                 # データベースに保存
                 self.diary_manager.add_diary_entry(diary_entry)
                 st.success("✅ 記録を保存しました！")
@@ -98,7 +113,8 @@ class UIComponents:
 
         # 選択された日付の日記データを取得（SQLite対応）
         selected_date_str = selected_date.strftime('%Y-%m-%d')
-        all_entries = self.diary_manager.get_all_diary_data()
+        user_id = st.session_state.get('user_id')
+        all_entries = self._get_user_diary_data(user_id)
         selected_date_entries = [entry for entry in all_entries if entry.get('date') == selected_date_str]
         # チャット履歴を表示
         if selected_date_entries:
@@ -176,7 +192,8 @@ class UIComponents:
 
     def _reanalyze_entry(self, entry_id: str) -> None:
         # 再分析（LLMで再実行）
-        all_data = self.diary_manager.get_all_diary_data()
+        user_id = st.session_state.get('user_id')
+        all_data = self._get_user_diary_data(user_id)
         for entry in all_data:
             if entry.get('id') == entry_id:
                 new_analysis = self.ai_analyzer.analyze_diary(entry['text'])
@@ -191,7 +208,8 @@ class UIComponents:
 
     def _save_qa_chain(self, entry_id: str, question: str, answer: str) -> None:
         """追加入力を保存（SQLite対応）"""
-        all_data = self.diary_manager.get_all_diary_data()
+        user_id = st.session_state.get('user_id')
+        all_data = self._get_user_diary_data(user_id)
         for entry in all_data:
             if entry.get('id') == entry_id:
                 # 新しいQ&Aを追加
@@ -221,7 +239,8 @@ class UIComponents:
     
     def show_history(self) -> None:
         st.title("📚 履歴一覧")
-        diary_data = self.diary_manager.get_all_diary_data()
+        user_id = st.session_state.get('user_id')
+        diary_data = self._get_user_diary_data(user_id)
         if diary_data:
             search_term = st.text_input("🔍 検索（日記の内容で検索）")
             col1, col2 = st.columns(2)
@@ -323,7 +342,8 @@ class UIComponents:
     
     def show_stats(self) -> None:
         st.title("📊 統計情報")
-        diary_data = self.diary_manager.get_all_diary_data()
+        user_id = st.session_state.get('user_id')
+        diary_data = self._get_user_diary_data(user_id)
         trends = self.ai_analyzer.analyze_trends(diary_data)
         if trends:
             col1, col2 = st.columns(2)
@@ -408,7 +428,8 @@ class UIComponents:
                 start_str = start_date.strftime('%Y-%m-%d')
                 end_str = end_date.strftime('%Y-%m-%d')
                 
-                all_data = self.diary_manager.get_all_diary_data()
+                user_id = st.session_state.get('user_id')
+                all_data = self._get_user_diary_data(user_id)
                 period_data = [
                     entry for entry in all_data 
                     if start_str <= entry.get('date', '') <= end_str

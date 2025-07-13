@@ -3,7 +3,12 @@ import json
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from ..ai_analyzer import AIAnalyzer
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import sys
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from ai_analyzer import AIAnalyzer
 
 # 分類カテゴリ
 categories = [
@@ -55,7 +60,7 @@ def extract_emotions_with_date(data_dir):
                             })
     return emotion_records
 
-def classify_emotions_with_llm(emotion_records, categories, ai_analyzer, cache_path="data/emotion_cache.json", use_cache=True):
+def classify_emotions_with_llm(emotion_records, categories, ai_analyzer: 'AIAnalyzer', cache_path="data/emotion_cache.json", use_cache=True):
     """emotionリストをLLMで7分類に分ける（キャッシュ機能付き）"""
     # キャッシュ機能の制御
     if not use_cache:

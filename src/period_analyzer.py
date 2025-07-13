@@ -3,6 +3,8 @@ from typing import Dict, Any, List
 import os
 import json
 import streamlit as st
+import sys
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from utils.prompt_manager import PromptManager
 
 class PeriodAnalyzer:

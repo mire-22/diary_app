@@ -326,7 +326,7 @@ def test_database_connection_error():
 def test_sql_error_handling(diary_manager):
     """SQLエラーのハンドリングをテスト"""
     # 無効なSQLを実行しようとする
-    with patch.object(diary_manager, '_insert_related_data') as mock_insert:
+            with patch.object(diary_manager, '_upsert_related_data') as mock_insert:
         mock_insert.side_effect = sqlite3.Error("SQL error")
         
         test_entry = {

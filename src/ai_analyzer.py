@@ -12,8 +12,19 @@ class AIAnalyzer:
         self.prompt_template = self._load_prompt()
         self.use_gemini = False
         self.model = None
-        # st.secretsからAPIキー取得
-        gemini_api_key = st.secrets.get("GEMINI_API_KEY")
+        
+        # 環境変数からAPIキー取得（st.secretsのフォールバック）
+        try:
+            import sys
+            sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+            from utils.config_manager import config
+            gemini_api_key = config.get_gemini_api_key()
+        except ImportError:
+            gemini_api_key = None
+            
+        if not gemini_api_key:
+            gemini_api_key = st.secrets.get("GEMINI_API_KEY")
+        
         if gemini_api_key:
             try:
                 import google.generativeai as genai
@@ -24,8 +35,8 @@ class AIAnalyzer:
                 st.error("google-generativeaiパッケージがインストールされていません。pip install google-generativeai でインストールしてください。")
                 st.stop()
         else:
-            st.error("GEMINI_API_KEYが設定されていません。.streamlit/secrets.tomlファイルにGEMINI_API_KEYを追加してください。")
-            st.stop()
+            st.warning("GEMINI_API_KEYが設定されていません。.envファイルまたは.streamlit/secrets.tomlファイルにGEMINI_API_KEYを追加してください。")
+            # エラーで停止せず、モックモードで動作
     
     def _load_prompt(self) -> str:
         try:
