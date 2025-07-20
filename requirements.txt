@@ -8,6 +8,7 @@ google-generativeai>=0.3.0
 pandas>=2.2.0
 plotly>=5.17.0
 matplotlib>=3.5.0
+seaborn>=0.12.0
 
 # 環境変数管理
 python-dotenv>=1.0.0
