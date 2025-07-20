@@ -124,7 +124,8 @@ def show_emotion_analysis():
 def extract_emotions_from_sqlite_user(diary_manager, user_id):
     """ユーザー別のSQLiteデータベースから感情データを抽出"""
     if user_id == "guest":
-        all_data = diary_manager.get_all_diary_data()
+        # ゲストユーザーは自分の日記のみ（user_idが'guest'のもの）
+        all_data = diary_manager.get_user_diary_data("guest")
     else:
         all_data = diary_manager.get_user_diary_data(user_id)
     
@@ -188,7 +189,7 @@ def show_sidebar_menu():
         st.sidebar.markdown("**📈 統計情報**")
         
         if st.session_state.user_id == "guest":
-            diary_data = st.session_state.diary_manager.get_all_diary_data()
+            diary_data = st.session_state.diary_manager.get_user_diary_data("guest")
         else:
             diary_data = st.session_state.diary_manager.get_user_diary_data(st.session_state.user_id)
         

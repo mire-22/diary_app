@@ -18,7 +18,7 @@ class UIComponents:
     
     def _get_user_diary_data(self, user_id: str = None):
         """ユーザー別の日記データを取得"""
-        if user_id and user_id != "guest":
+        if user_id:
             return self.diary_manager.get_user_diary_data(user_id)
         else:
             return self.diary_manager.get_all_diary_data()
