@@ -14,7 +14,7 @@
 
 #### 2.1 アプリケーション設定
 - **Main file path**: `streamlit_app.py`
-- **Python version**: 3.9以上を選択
+- **Python version**: 3.9.18を選択（runtime.txtで指定）
 
 #### 2.2 環境変数の設定
 Streamlit Cloudの管理画面で以下の環境変数を設定：
@@ -52,6 +52,7 @@ GEMINI_API_KEY = "your_gemini_api_key_here"
 #### 2. 依存関係の確認
 - `requirements.txt`のバージョンが固定されているか確認
 - 互換性のないパッケージがないか確認
+- `runtime.txt`でPythonバージョンを指定しているか確認
 
 #### 3. 環境変数の確認
 - `GEMINI_API_KEY`が正しく設定されているか確認
