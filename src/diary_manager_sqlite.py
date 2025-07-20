@@ -145,9 +145,6 @@ class DiaryManagerSQLite:
             # エントリIDを決定（original_idがあれば使用、なければ生成）
             entry_id = entry.get('id') or str(uuid.uuid4())
             
-            # デバッグ情報
-            print(f"保存中: user_id={entry.get('user_id')}, date={entry.get('date')}, text={entry.get('text', '')[:50]}...")
-            
             # メインエントリをUPSERT（INSERT OR UPDATE）
             cur.execute('''
                 INSERT OR REPLACE INTO diary_entries (
@@ -167,11 +164,9 @@ class DiaryManagerSQLite:
             self._upsert_related_data(cur, entry_id, entry)
             
             conn.commit()
-            print(f"保存完了: entry_id={entry_id}")
             return entry_id
             
         except Exception as e:
-            print(f"保存エラー: {e}")
             if 'conn' in locals():
                 conn.rollback()
             raise e
