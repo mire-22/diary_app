@@ -102,7 +102,7 @@ class UIComponents:
                 diary_entry['date'] = selected_date.strftime('%Y-%m-%d')
                 # ユーザーIDを設定
                 user_id = st.session_state.get('user_id')
-                if user_id and user_id != "guest":
+                if user_id:
                     diary_entry['user_id'] = user_id
                 # データベースに保存
                 self.diary_manager.add_diary_entry(diary_entry)
