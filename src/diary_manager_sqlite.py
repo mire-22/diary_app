@@ -10,16 +10,39 @@ class DiaryManagerSQLite:
     """SQLite対応の日記データ管理クラス"""
     
     def __init__(self, db_path: str = "data/diary_normalized.db"):
-        self.db_path = db_path
+        # Streamlit Cloud対応: 絶対パスを使用
+        if not os.path.isabs(db_path):
+            import tempfile
+            # Streamlit Cloudでは一時ディレクトリを使用
+            if os.environ.get('STREAMLIT_SERVER_RUN_ON_SAVE', ''):
+                # Streamlit Cloud環境
+                self.db_path = os.path.join(tempfile.gettempdir(), "diary_normalized.db")
+            else:
+                # ローカル環境
+                self.db_path = db_path
+        else:
+            self.db_path = db_path
+        
         self.ensure_database()
     
     def ensure_database(self) -> None:
         """データベースが存在しない場合は作成"""
         import os
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         
-        conn = sqlite3.connect(self.db_path)
-        cur = conn.cursor()
+        # ディレクトリが存在しない場合は作成（絶対パスの場合のみ）
+        if not os.path.isabs(self.db_path):
+            os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cur = conn.cursor()
+        except Exception as e:
+            print(f"データベース接続エラー: {e}")
+            # フォールバック: メモリ内データベースを使用
+            import tempfile
+            self.db_path = os.path.join(tempfile.gettempdir(), "diary_normalized.db")
+            conn = sqlite3.connect(self.db_path)
+            cur = conn.cursor()
         
         try:
             # メインテーブルを作成
@@ -115,12 +138,15 @@ class DiaryManagerSQLite:
     
     def add_diary_entry(self, entry: dict[str, Any]) -> str:
         """新しい日記エントリを追加（重複しない構造）"""
-        conn = sqlite3.connect(self.db_path)
-        cur = conn.cursor()
-        
         try:
+            conn = sqlite3.connect(self.db_path)
+            cur = conn.cursor()
+            
             # エントリIDを決定（original_idがあれば使用、なければ生成）
             entry_id = entry.get('id') or str(uuid.uuid4())
+            
+            # デバッグ情報
+            print(f"保存中: user_id={entry.get('user_id')}, date={entry.get('date')}, text={entry.get('text', '')[:50]}...")
             
             # メインエントリをUPSERT（INSERT OR UPDATE）
             cur.execute('''
@@ -141,13 +167,17 @@ class DiaryManagerSQLite:
             self._upsert_related_data(cur, entry_id, entry)
             
             conn.commit()
+            print(f"保存完了: entry_id={entry_id}")
             return entry_id
             
         except Exception as e:
-            conn.rollback()
+            print(f"保存エラー: {e}")
+            if 'conn' in locals():
+                conn.rollback()
             raise e
         finally:
-            conn.close()
+            if 'conn' in locals():
+                conn.close()
     
     def add_diary_entries_batch(self, entries: list[dict[str, Any]]) -> list[str]:
         """複数の日記エントリを一括追加（重複しない構造）"""
