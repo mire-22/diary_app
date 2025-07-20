@@ -235,23 +235,28 @@ def show_sidebar_menu():
 
 # ===== メインアプリケーション =====
 
-# ログイン状態で表示を分岐
-if not st.session_state.logged_in:
-    show_login_page()
-else:
-    # サイドバーメニューを表示
-    show_sidebar_menu()
-    
-    # ページ表示
-    if st.session_state.page == "home":
-        ui.show_home()
-    elif st.session_state.page == "write":
-        ui.show_write()
-    elif st.session_state.page == "history":
-        ui.show_history()
-    elif st.session_state.page == "stats":
-        ui.show_stats()
-    elif st.session_state.page == "emotion":
-        show_emotion_analysis()
-    elif st.session_state.page == "period_summary":
-        ui.show_period_summary()
+def main():
+    """メインアプリケーション関数"""
+    # ログイン状態で表示を分岐
+    if not st.session_state.logged_in:
+        show_login_page()
+    else:
+        # サイドバーメニューを表示
+        show_sidebar_menu()
+        
+        # ページ表示
+        if st.session_state.page == "home":
+            ui.show_home()
+        elif st.session_state.page == "write":
+            ui.show_write()
+        elif st.session_state.page == "history":
+            ui.show_history()
+        elif st.session_state.page == "stats":
+            ui.show_stats()
+        elif st.session_state.page == "emotion":
+            show_emotion_analysis()
+        elif st.session_state.page == "period_summary":
+            ui.show_period_summary()
+
+if __name__ == "__main__":
+    main()
