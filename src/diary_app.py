@@ -14,35 +14,8 @@ from utils.emotion_analyzer import (
     categories
 )
 
-# ===== 認証状態初期化 =====
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if "user_id" not in st.session_state:
-    st.session_state.user_id = None
-if "username" not in st.session_state:
-    st.session_state.username = ""
-
-# インスタンス生成
-try:
-    if 'diary_manager' not in st.session_state:
-        st.session_state.diary_manager = DiaryManagerSQLite()
-    if 'ai_analyzer' not in st.session_state:
-        st.session_state.ai_analyzer = AIAnalyzer()
-    if 'period_analyzer' not in st.session_state:
-        st.session_state.period_analyzer = PeriodAnalyzer(st.session_state.ai_analyzer)
-    if 'ui' not in st.session_state:
-        st.session_state.ui = UIComponents(st.session_state.diary_manager, st.session_state.ai_analyzer, st.session_state.period_analyzer)
-except Exception as e:
-    st.error(f"アプリケーションの初期化に失敗しました: {e}")
-    st.stop()
-
-# ページ状態初期化
-if "page" not in st.session_state:
-    st.session_state.page = "home"
-if "analysis" not in st.session_state:
-    st.session_state.analysis = {}
-
-ui = st.session_state.ui
+# グローバル変数
+ui = None
 
 # ===== 認証機能 =====
 
@@ -237,6 +210,37 @@ def show_sidebar_menu():
 
 def main():
     """メインアプリケーション関数"""
+    global ui
+    
+    # ===== セッション状態初期化 =====
+    if "logged_in" not in st.session_state:
+        st.session_state.logged_in = False
+    if "user_id" not in st.session_state:
+        st.session_state.user_id = None
+    if "username" not in st.session_state:
+        st.session_state.username = ""
+    if "page" not in st.session_state:
+        st.session_state.page = "home"
+    if "analysis" not in st.session_state:
+        st.session_state.analysis = {}
+
+    # ===== インスタンス生成 =====
+    try:
+        if 'diary_manager' not in st.session_state:
+            st.session_state.diary_manager = DiaryManagerSQLite()
+        if 'ai_analyzer' not in st.session_state:
+            st.session_state.ai_analyzer = AIAnalyzer()
+        if 'period_analyzer' not in st.session_state:
+            st.session_state.period_analyzer = PeriodAnalyzer(st.session_state.ai_analyzer)
+        if 'ui' not in st.session_state:
+            st.session_state.ui = UIComponents(st.session_state.diary_manager, st.session_state.ai_analyzer, st.session_state.period_analyzer)
+        
+        ui = st.session_state.ui
+    except Exception as e:
+        st.error(f"アプリケーションの初期化に失敗しました: {e}")
+        st.stop()
+
+    # ===== メイン処理 =====
     # ログイン状態で表示を分岐
     if not st.session_state.logged_in:
         show_login_page()
