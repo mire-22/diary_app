@@ -104,10 +104,23 @@ class UIComponents:
                 user_id = st.session_state.get('user_id')
                 if user_id:
                     diary_entry['user_id'] = user_id
+                
+                # デバッグ情報を表示
+                st.info(f"デバッグ: user_id={user_id}, diary_entry={diary_entry}")
+                
                 # データベースに保存
-                self.diary_manager.add_diary_entry(diary_entry)
-                st.success("✅ 記録を保存しました！")
-                st.rerun()
+                try:
+                    entry_id = self.diary_manager.add_diary_entry(diary_entry)
+                    st.success(f"✅ 記録を保存しました！(ID: {entry_id})")
+                    
+                    # 保存後の確認
+                    saved_data = self.diary_manager.get_user_diary_data(user_id)
+                    st.info(f"保存後のデータ数: {len(saved_data)}")
+                    
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"保存エラー: {e}")
+                    st.info(f"エラー詳細: diary_entry={diary_entry}")
             else:
                 st.error("日記の内容を入力してください。")
 
@@ -115,6 +128,14 @@ class UIComponents:
         selected_date_str = selected_date.strftime('%Y-%m-%d')
         user_id = st.session_state.get('user_id')
         all_entries = self._get_user_diary_data(user_id)
+        
+        # デバッグ情報を表示
+        st.sidebar.info(f"デバッグ: user_id={user_id}, date={selected_date_str}, total_entries={len(all_entries)}")
+        
+        # データベースから直接取得して比較
+        direct_data = self.diary_manager.get_user_diary_data(user_id)
+        st.sidebar.info(f"直接取得: user_id={user_id}, direct_entries={len(direct_data)}")
+        
         selected_date_entries = [entry for entry in all_entries if entry.get('date') == selected_date_str]
         # チャット履歴を表示
         if selected_date_entries:
