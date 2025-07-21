@@ -2,7 +2,23 @@ import streamlit as st
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from diary_manager_sqlite import DiaryManagerSQLite
+from dotenv import load_dotenv
+
+# 環境切り替え（local or cloud）
+ENV = os.getenv("APP_ENV", "local")
+if ENV == "local":
+    load_dotenv()
+
+# データベースマネージャーの選択
+USE_SUPABASE = os.getenv("USE_SUPABASE", "false").lower() == "true"
+
+
+if USE_SUPABASE:
+    from diary_manager_supabase import DiaryManagerSupabase as DiaryManager
+    from ui.supabase_auth_ui import render_auth_ui, render_user_profile, render_auth_status
+else:
+    from diary_manager_sqlite import DiaryManagerSQLite as DiaryManager
+
 from ai_analyzer import AIAnalyzer
 from period_analyzer import PeriodAnalyzer
 from ui_components import UIComponents
@@ -21,69 +37,91 @@ ui = None
 
 def show_login_page():
     """ログインページを表示"""
-    st.title("🔐 AI日記アプリ - ログイン")
-    
-    # タブでログインと新規登録を切り替え
-    tab1, tab2 = st.tabs(["ログイン", "新規登録"])
-    
-    with tab1:
-        st.subheader("ログイン")
-        username = st.text_input("ユーザー名", key="login_username")
-        password = st.text_input("パスワード", type="password", key="login_password")
+    if USE_SUPABASE:
+        # Supabase認証UIを表示
+        user = render_auth_ui()
+        if user:
+            st.session_state.logged_in = True
+            st.session_state.user_id = user.get('id')
+            st.session_state.username = user.get('email', 'ユーザー')
+            st.success(f"{user.get('email', 'ユーザー')} さん、ログイン成功！")
+            st.rerun()
+    else:
+        # 従来のSQLite認証
+        st.title("🔐 AI日記アプリ - ログイン")
         
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("ログイン", use_container_width=True):
-                if username and password:
-                    user_id = st.session_state.diary_manager.authenticate_user(username, password)
-                    if user_id:
-                        st.session_state.logged_in = True
-                        st.session_state.user_id = user_id
-                        st.session_state.username = username
-                        st.success(f"{username} さん、ログイン成功！")
-                        st.rerun()
-                    else:
-                        st.error("ユーザー名またはパスワードが違います")
-                else:
-                    st.warning("ユーザー名とパスワードを入力してください")
+        # タブでログインと新規登録を切り替え
+        tab1, tab2 = st.tabs(["ログイン", "新規登録"])
         
-        with col2:
-            if st.button("ゲストログイン", use_container_width=True):
-                st.session_state.logged_in = True
-                st.session_state.user_id = "guest"
-                st.session_state.username = "ゲスト"
-                st.success("ゲストとしてログインしました")
-                st.rerun()
-    
-    with tab2:
-        st.subheader("新規登録")
-        new_username = st.text_input("ユーザー名", key="register_username")
-        new_password = st.text_input("パスワード", type="password", key="register_password")
-        confirm_password = st.text_input("パスワード（確認）", type="password", key="confirm_password")
-        
-        if st.button("登録", use_container_width=True):
-            if new_username and new_password and confirm_password:
-                if new_password == confirm_password:
-                    if len(new_password) >= 6:
-                        success = st.session_state.diary_manager.create_user(new_username, new_password)
-                        if success:
-                            st.success("ユーザー登録が完了しました！ログインしてください。")
+        with tab1:
+            st.subheader("ログイン")
+            username = st.text_input("ユーザー名", key="login_username")
+            password = st.text_input("パスワード", type="password", key="login_password")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("ログイン", use_container_width=True):
+                    if username and password:
+                        user_id = st.session_state.diary_manager.authenticate_user(username, password)
+                        if user_id:
+                            st.session_state.logged_in = True
+                            st.session_state.user_id = user_id
+                            st.session_state.username = username
+                            st.success(f"{username} さん、ログイン成功！")
+                            st.rerun()
                         else:
-                            st.error("ユーザー名が既に使用されています")
+                            st.error("ユーザー名またはパスワードが違います")
                     else:
-                        st.warning("パスワードは6文字以上で入力してください")
+                        st.warning("ユーザー名とパスワードを入力してください")
+            
+            with col2:
+                if st.button("ゲストログイン", use_container_width=True):
+                    st.session_state.logged_in = True
+                    st.session_state.user_id = "guest"
+                    st.session_state.username = "ゲスト"
+                    st.success("ゲストとしてログインしました")
+                    st.rerun()
+        
+        with tab2:
+            st.subheader("新規登録")
+            new_username = st.text_input("ユーザー名", key="register_username")
+            new_password = st.text_input("パスワード", type="password", key="register_password")
+            confirm_password = st.text_input("パスワード（確認）", type="password", key="confirm_password")
+            
+            if st.button("登録", use_container_width=True):
+                if new_username and new_password and confirm_password:
+                    if new_password == confirm_password:
+                        if len(new_password) >= 6:
+                            success = st.session_state.diary_manager.create_user(new_username, new_password)
+                            if success:
+                                st.success("ユーザー登録が完了しました！ログインしてください。")
+                            else:
+                                st.error("ユーザー名が既に使用されています")
+                        else:
+                            st.warning("パスワードは6文字以上で入力してください")
+                    else:
+                        st.error("パスワードが一致しません")
                 else:
-                    st.error("パスワードが一致しません")
-            else:
-                st.warning("すべての項目を入力してください")
+                    st.warning("すべての項目を入力してください")
 
 def logout():
     """ログアウト処理"""
-    st.session_state.logged_in = False
-    st.session_state.user_id = None
-    st.session_state.username = ""
-    st.success("ログアウトしました")
-    st.rerun()
+    if USE_SUPABASE:
+        from config.supabase_config import get_supabase_config
+        supabase = get_supabase_config()
+        result = supabase.sign_out()
+        if result["success"]:
+            st.session_state.logged_in = False
+            st.session_state.user_id = None
+            st.session_state.username = ""
+            st.success("ログアウトしました")
+            st.rerun()
+    else:
+        st.session_state.logged_in = False
+        st.session_state.user_id = None
+        st.session_state.username = ""
+        st.success("ログアウトしました")
+        st.rerun()
 
 # ===== 感情分類画面（ユーザー別） =====
 
@@ -151,11 +189,15 @@ def show_sidebar_menu():
     """サイドバーメニューを表示（ユーザー別）"""
     st.sidebar.title("📖 AI日記アプリ")
     
-    # ユーザー情報表示
-    if st.session_state.logged_in:
-        st.sidebar.markdown(f"**👤 {st.session_state.username} さん**")
-        if st.sidebar.button("🚪 ログアウト", use_container_width=True):
-            logout()
+    # 認証状態の表示
+    if USE_SUPABASE:
+        render_auth_status()
+    else:
+        # 従来のユーザー情報表示
+        if st.session_state.logged_in:
+            st.sidebar.markdown(f"**👤 {st.session_state.username} さん**")
+            if st.sidebar.button("🚪 ログアウト", use_container_width=True):
+                logout()
     
     st.sidebar.markdown("---")
     
@@ -208,7 +250,6 @@ def show_sidebar_menu():
     st.sidebar.markdown("左のメニューから各機能にアクセスできます")
 
 # ===== メインアプリケーション =====
-
 def main():
     """メインアプリケーション関数"""
     global ui
@@ -228,7 +269,7 @@ def main():
     # ===== インスタンス生成 =====
     try:
         if 'diary_manager' not in st.session_state:
-            st.session_state.diary_manager = DiaryManagerSQLite()
+            st.session_state.diary_manager = DiaryManager()
         if 'ai_analyzer' not in st.session_state:
             st.session_state.ai_analyzer = AIAnalyzer()
         if 'period_analyzer' not in st.session_state:

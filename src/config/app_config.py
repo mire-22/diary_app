@@ -5,6 +5,23 @@
 import os
 from typing import Dict, Any, Optional
 from constants import DEFAULT_DB_PATH, APP_NAME, APP_VERSION
+from dotenv import load_dotenv
+
+# 環境切り替え（local or cloud）
+ENV = os.getenv("APP_ENV", "local")
+if ENV == "local":
+    load_dotenv()
+
+# アプリケーション設定
+DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
+DB_PATH = os.getenv('DB_PATH', 'data/diary_normalized.db')
+PASSWORD_MIN_LENGTH = int(os.getenv('PASSWORD_MIN_LENGTH', 6))
+SESSION_TIMEOUT = int(os.getenv('SESSION_TIMEOUT', 3600))
+
+# Supabase設定
+USE_SUPABASE = os.getenv('USE_SUPABASE', 'false').lower() == 'true'
+SUPABASE_URL = os.getenv('SUPABASE_URL', '')
+SUPABASE_ANON_KEY = os.getenv('SUPABASE_ANON_KEY', '')
 
 class AppConfig:
     """アプリケーション設定管理クラス"""
@@ -18,10 +35,10 @@ class AppConfig:
             'app': {
                 'name': APP_NAME,
                 'version': APP_VERSION,
-                'debug': os.getenv('DEBUG', 'False').lower() == 'true'
+                'debug': DEBUG
             },
             'database': {
-                'path': os.getenv('DB_PATH', DEFAULT_DB_PATH),
+                'path': DB_PATH,
                 'backup_enabled': os.getenv('BACKUP_ENABLED', 'True').lower() == 'true',
                 'backup_interval': int(os.getenv('BACKUP_INTERVAL', '24'))  # 時間
             },
@@ -32,8 +49,8 @@ class AppConfig:
                 'timeout': int(os.getenv('AI_TIMEOUT', '30'))  # 秒
             },
             'security': {
-                'password_min_length': int(os.getenv('PASSWORD_MIN_LENGTH', '6')),
-                'session_timeout': int(os.getenv('SESSION_TIMEOUT', '3600')),  # 秒
+                'password_min_length': PASSWORD_MIN_LENGTH,
+                'session_timeout': SESSION_TIMEOUT,  # 秒
                 'max_login_attempts': int(os.getenv('MAX_LOGIN_ATTEMPTS', '5'))
             },
             'ui': {
