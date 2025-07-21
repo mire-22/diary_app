@@ -153,10 +153,10 @@ def render_user_profile(user: Dict[str, Any]):
     col1, col2 = st.columns([3, 1])
     
     with col1:
-        st.write(f"**メールアドレス:** {user.get('email', 'N/A')}")
-        st.write(f"**ユーザーID:** {user.get('id', 'N/A')}")
+        st.write(f"**メールアドレス:** {getattr(user, 'email', 'N/A')}")
+        st.write(f"**ユーザーID:** {getattr(user, 'id', 'N/A')}")
         
-        if user.get('email_confirmed_at'):
+        if getattr(user, 'email_confirmed_at', None):
             st.success("✅ メールアドレス確認済み")
         else:
             st.warning("⚠️ メールアドレス未確認")
@@ -180,7 +180,7 @@ def render_auth_status():
         current_user = supabase.get_current_user()
         
         if current_user:
-            st.sidebar.success(f"✅ {current_user.get('email', 'ログイン中')}")
+            st.sidebar.success(f"✅ {getattr(current_user, 'email', 'ログイン中')}")
             
             if st.sidebar.button("ログアウト", key="sidebar_logout"):
                 result = supabase.sign_out()
