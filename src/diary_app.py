@@ -41,13 +41,10 @@ def show_login_page():
         # Supabase認証UIを表示
         user = render_auth_ui()
         if user:
-            if hasattr(user, 'id'):
-                st.session_state.user_id = user.id
-                st.session_state.username = getattr(user, 'email', 'ユーザー')
-            else:
-                st.session_state.user_id = user.get('id')
-                st.session_state.username = user.get('email', 'ユーザー')
-            st.success(f"{user.get('email', 'ユーザー')} さん、ログイン成功！")
+            st.session_state.logged_in = True
+            st.session_state.user_id = getattr(user, 'id', None)
+            st.session_state.username = getattr(user, 'email', 'ユーザー')
+            st.success(f"{st.session_state.username} さん、ログイン成功！")
             st.rerun()
     else:
         # 従来のSQLite認証
