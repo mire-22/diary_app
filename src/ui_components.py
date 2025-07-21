@@ -4,24 +4,21 @@ import datetime
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from diary_manager_sqlite import DiaryManagerSQLite
+from diary_manager_supabase import DiaryManagerSupabase
 from ai_analyzer import AIAnalyzer
 from period_analyzer import PeriodAnalyzer
 
 class UIComponents:
-    """UIコンポーネントクラス"""
+    """UIコンポーネントクラス（Supabase専用）"""
     
-    def __init__(self, diary_manager: DiaryManagerSQLite, ai_analyzer: AIAnalyzer, period_analyzer=None):
+    def __init__(self, diary_manager: DiaryManagerSupabase, ai_analyzer: AIAnalyzer, period_analyzer=None):
         self.diary_manager = diary_manager
         self.ai_analyzer = ai_analyzer
         self.period_analyzer = period_analyzer if period_analyzer else PeriodAnalyzer(ai_analyzer)
     
-    def _get_user_diary_data(self, user_id: str = None):
-        """ユーザー別の日記データを取得"""
-        if user_id:
-            return self.diary_manager.get_user_diary_data(user_id)
-        else:
-            return self.diary_manager.get_all_diary_data()
+    def _get_user_diary_data(self):
+        """認証ユーザーの日記データを取得（Supabase専用）"""
+        return self.diary_manager.get_diary_entries()
     
     def show_home(self) -> None:
         """ホーム画面を表示"""
@@ -60,8 +57,7 @@ class UIComponents:
         
         # 最近の日記を表示
         st.markdown("### 📅 最近の日記")
-        user_id = st.session_state.get('user_id')
-        diary_data = self._get_user_diary_data(user_id)
+        diary_data = self._get_user_diary_data()
         if diary_data:
             recent_entries = sorted(diary_data, key=lambda x: x.get('created_at', ''), reverse=True)[:3]
             for entry in recent_entries:
@@ -78,7 +74,7 @@ class UIComponents:
         
         # 新しい入力フォーム（ページ最上部）
         st.markdown("### 💭 新しい記録を追加")
-        with st.form("diary_form"):
+        with st.form("write_diary_form"):
             # 日付選択フィールド
             selected_date = st.date_input(
                 "📅 日付を選択",
@@ -100,14 +96,13 @@ class UIComponents:
                 diary_entry = self.ai_analyzer.create_diary_entry(diary_input)
                 # 選択された日付を設定
                 diary_entry['date'] = selected_date.strftime('%Y-%m-%d')
-                # ユーザーIDを設定
-                user_id = st.session_state.get('user_id')
-                if user_id:
-                    diary_entry['user_id'] = user_id
-                
                 # データベースに保存
                 try:
-                    entry_id = self.diary_manager.add_diary_entry(diary_entry)
+                    entry_id = self.diary_manager.create_diary_entry(
+                        text=diary_entry['text'],
+                        entry_date=selected_date,
+                        question=diary_entry.get('question')
+                    )
                     st.success("✅ 記録を保存しました！")
                     st.rerun()
                 except Exception as e:
@@ -115,11 +110,10 @@ class UIComponents:
             else:
                 st.error("日記の内容を入力してください。")
 
-        # 選択された日付の日記データを取得（SQLite対応）
+        # 選択された日付の日記データを取得（Supabase対応）
         selected_date_str = selected_date.strftime('%Y-%m-%d')
-        user_id = st.session_state.get('user_id')
-        all_entries = self._get_user_diary_data(user_id)
-        selected_date_entries = [entry for entry in all_entries if entry.get('date') == selected_date_str]
+        diary_data = self._get_user_diary_data()
+        selected_date_entries = [entry for entry in diary_data if entry.get('date') == selected_date_str]
         # チャット履歴を表示
         if selected_date_entries:
             st.markdown(f"### 📅 {selected_date_str} の記録")
@@ -196,9 +190,8 @@ class UIComponents:
 
     def _reanalyze_entry(self, entry_id: str) -> None:
         # 再分析（LLMで再実行）
-        user_id = st.session_state.get('user_id')
-        all_data = self._get_user_diary_data(user_id)
-        for entry in all_data:
+        diary_data = self._get_user_diary_data()
+        for entry in diary_data:
             if entry.get('id') == entry_id:
                 new_analysis = self.ai_analyzer.analyze_diary(entry['text'])
                 # 更新データを準備
@@ -206,15 +199,14 @@ class UIComponents:
                 for k in ["topics", "emotions", "thoughts", "goals", "question", "followup_questions"]:
                     if k in new_analysis:
                         updated_data[k] = new_analysis[k]
-                # SQLiteで更新
+                # Supabaseで更新
                 self.diary_manager.update_diary_entry(entry_id, updated_data)
                 break
 
     def _save_qa_chain(self, entry_id: str, question: str, answer: str) -> None:
-        """追加入力を保存（SQLite対応）"""
-        user_id = st.session_state.get('user_id')
-        all_data = self._get_user_diary_data(user_id)
-        for entry in all_data:
+        """追加入力を保存（Supabase対応）"""
+        diary_data = self._get_user_diary_data()
+        for entry in diary_data:
             if entry.get('id') == entry_id:
                 # 新しいQ&Aを追加
                 if 'qa_chain' not in entry:
@@ -224,130 +216,129 @@ class UIComponents:
                     'answer': answer,
                     'created_at': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 })
-                # SQLiteで更新
+                # Supabaseで更新
                 self.diary_manager.update_diary_entry(entry_id, entry)
                 break
     
     def _update_entry_date(self, entry_id: str, new_date: str) -> None:
-        """日記エントリの日付を更新（SQLite対応）"""
-        all_data = self.diary_manager.get_all_diary_data()
-        for entry in all_data:
+        """日記エントリの日付を更新（Supabase対応）"""
+        diary_data = self._get_user_diary_data()
+        for entry in diary_data:
             if entry.get('id') == entry_id:
                 # 日付を更新
                 entry['date'] = new_date
-                # SQLiteで更新
+                # Supabaseで更新
                 self.diary_manager.update_diary_entry(entry_id, entry)
                 break
     
-
-    
     def show_history(self) -> None:
         st.title("📚 履歴一覧")
-        user_id = st.session_state.get('user_id')
-        diary_data = self._get_user_diary_data(user_id)
-        if diary_data:
-            search_term = st.text_input("🔍 検索（日記の内容で検索）")
-            col1, col2 = st.columns(2)
-            with col1:
-                start_date = st.date_input("開始日", value=None)
-            with col2:
-                end_date = st.date_input("終了日", value=None)
-            filtered_data = diary_data
-            if search_term:
-                filtered_data = [entry for entry in filtered_data if search_term.lower() in entry.get('text', '').lower()]
-            if start_date and end_date:
-                start_str = start_date.strftime("%Y-%m-%d")
-                end_str = end_date.strftime("%Y-%m-%d")
-                filtered_data = [entry for entry in filtered_data if start_str <= entry.get('date', '') <= end_str]
-            st.write(f"**表示件数:** {len(filtered_data)}件")
-            for idx, entry in enumerate(filtered_data):
-                with st.expander(f"📅 {entry['date']} - {entry['text'][:50]}..."):
-                    # 日記内容と日付編集
-                    col1, col2 = st.columns([3, 1])
-                    with col1:
-                        st.markdown(f"**📖 日記内容:**")
-                        st.write(entry['text'])
-                    with col2:
-                        # 現在の日付をdatetime.dateオブジェクトに変換
-                        current_date = datetime.datetime.strptime(entry['date'], '%Y-%m-%d').date()
-                        new_date = st.date_input(
-                            "📅 日付変更",
-                            value=current_date,
-                            key=f"date_edit_{entry['id']}_{idx}",
-                            help="日付を変更して保存ボタンを押してください"
-                        )
-                        if st.button("💾 保存", key=f"save_date_{entry['id']}_{idx}"):
-                            if new_date != current_date:
-                                self._update_entry_date(entry['id'], new_date.strftime('%Y-%m-%d'))
-                                st.success("日付を更新しました！")
-                                st.rerun()
-                    
-                    # 分析結果の表示
-                    st.markdown("**🔍 分析結果:**")
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.write(f"**🧠 トピック:** {', '.join(entry['topics'])}")
-                        st.write(f"**🎭 感情:** {', '.join(entry['emotions'])}")
-                    with col2:
-                        st.write(f"**💭 思考:** {', '.join(entry['thoughts'])}")
-                        st.write(f"**🎯 目標:** {', '.join(entry['goals'])}")
-                    
-                    st.write(f"**🧩 最終質問:** {entry['question']}")
-                    
-                    # QAチェーンの表示
-                    qa_chain = entry.get('qa_chain', [])
-                    if qa_chain:
-                        st.markdown("**💬 質問と回答:**")
-                        for i, qa in enumerate(qa_chain):
-                            with st.container():
-                                st.markdown(f"""
-                                <div style='margin:8px 0;padding:12px;border-radius:8px;background:#f7f7fa;border-left:4px solid #2196f3;'>
-                                    <b>👤 Q{i+1}:</b> {qa['question']}<br>
-                                    <b>🗨️ A{i+1}:</b> {qa['answer']}
-                                </div>
-                                """, unsafe_allow_html=True)
-                    else:
-                        st.info("まだ質問への回答がありません。")
-                    
-                    # 次の質問（未回答）の表示と回答入力
-                    next_question = None
-                    if qa_chain:
-                        followups = entry.get('followup_questions', [])
-                        if len(qa_chain) < len(followups):
-                            next_question = followups[len(qa_chain)]
-                    else:
-                        next_question = entry.get('question')
-                    
-                    if next_question:
-                        st.markdown("**📝 次の質問:**")
-                        st.markdown(f"**Q{len(qa_chain)+1}:** {next_question}")
-                        with st.form(f"history_followup_form_{entry['id']}_{idx}_{len(qa_chain)}"):
-                            followup_input = st.text_area(
-                                "この質問についてどう思いましたか？",
-                                height=100,
-                                placeholder="ここに回答を書いてください...",
-                                key=f"history_followup_{entry['id']}_{idx}_{len(qa_chain)}"
-                            )
-                            if st.form_submit_button("回答を保存", type="secondary"):
-                                if followup_input.strip():
-                                    self._save_qa_chain(entry['id'], next_question, followup_input)
-                                    st.success("回答を保存しました！")
-                                    st.rerun()
-                                else:
-                                    st.error("回答を入力してください。")
-                    
-                    # 削除ボタン
-                    if st.button(f"🗑️ 削除", key=f"delete_{entry['id']}_{idx}"):
-                        if self.diary_manager.delete_diary_entry(entry['id']):
-                            st.success("削除しました")
+        diary_data = self._get_user_diary_data()
+        if not diary_data:
+            st.info("まだ日記がありません。新しい日記を書いてみましょう！")
+            return
+        search_term = st.text_input("🔍 検索（日記の内容で検索）")
+        col1, col2 = st.columns(2)
+        with col1:
+            start_date = st.date_input("開始日", value=None)
+        with col2:
+            end_date = st.date_input("終了日", value=None)
+        filtered_data = diary_data
+        if search_term:
+            filtered_data = [entry for entry in filtered_data if search_term.lower() in entry.get('text', '').lower()]
+        if start_date and end_date:
+            start_str = start_date.strftime("%Y-%m-%d")
+            end_str = end_date.strftime("%Y-%m-%d")
+            filtered_data = [entry for entry in filtered_data if start_str <= entry.get('date', '') <= end_str]
+        st.write(f"**表示件数:** {len(filtered_data)}件")
+        for idx, entry in enumerate(filtered_data):
+            with st.expander(f"📅 {entry['date']} - {entry['text'][:50]}..."):
+                # 日記内容と日付編集
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.markdown(f"**📖 日記内容:**")
+                    st.write(entry['text'])
+                with col2:
+                    # 現在の日付をdatetime.dateオブジェクトに変換
+                    current_date = datetime.datetime.strptime(entry['date'], '%Y-%m-%d').date()
+                    new_date = st.date_input(
+                        "📅 日付変更",
+                        value=current_date,
+                        key=f"date_edit_{entry['id']}_{idx}",
+                        help="日付を変更して保存ボタンを押してください"
+                    )
+                    if st.button("💾 保存", key=f"save_date_{entry['id']}_{idx}"):
+                        if new_date != current_date:
+                            self._update_entry_date(entry['id'], new_date.strftime('%Y-%m-%d'))
+                            st.success("日付を更新しました！")
                             st.rerun()
-        else:
-            st.info("履歴がまだありません。")
+                
+                # 分析結果の表示
+                st.markdown("**🔍 分析結果:**")
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.write(f"**🧠 トピック:** {', '.join(entry['topics'])}")
+                    st.write(f"**🎭 感情:** {', '.join(entry['emotions'])}")
+                with col2:
+                    st.write(f"**💭 思考:** {', '.join(entry['thoughts'])}")
+                    st.write(f"**🎯 目標:** {', '.join(entry['goals'])}")
+                
+                st.write(f"**🧩 最終質問:** {entry['question']}")
+                
+                # QAチェーンの表示
+                qa_chain = entry.get('qa_chain', [])
+                if qa_chain:
+                    st.markdown("**💬 質問と回答:**")
+                    for i, qa in enumerate(qa_chain):
+                        with st.container():
+                            st.markdown(f"""
+                            <div style='margin:8px 0;padding:12px;border-radius:8px;background:#f7f7fa;border-left:4px solid #2196f3;'>
+                                <b>👤 Q{i+1}:</b> {qa['question']}<br>
+                                <b>🗨️ A{i+1}:</b> {qa['answer']}
+                            </div>
+                            """, unsafe_allow_html=True)
+                else:
+                    st.info("まだ質問への回答がありません。")
+                
+                # 次の質問（未回答）の表示と回答入力
+                next_question = None
+                if qa_chain:
+                    followups = entry.get('followup_questions', [])
+                    if len(qa_chain) < len(followups):
+                        next_question = followups[len(qa_chain)]
+                else:
+                    next_question = entry.get('question')
+                
+                if next_question:
+                    st.markdown("**📝 次の質問:**")
+                    st.markdown(f"**Q{len(qa_chain)+1}:** {next_question}")
+                    with st.form(f"history_followup_form_{entry['id']}_{idx}_{len(qa_chain)}"):
+                        followup_input = st.text_area(
+                            "この質問についてどう思いましたか？",
+                            height=100,
+                            placeholder="ここに回答を書いてください...",
+                            key=f"history_followup_{entry['id']}_{idx}_{len(qa_chain)}"
+                        )
+                        if st.form_submit_button("回答を保存", type="secondary"):
+                            if followup_input.strip():
+                                self._save_qa_chain(entry['id'], next_question, followup_input)
+                                st.success("回答を保存しました！")
+                                st.rerun()
+                            else:
+                                st.error("回答を入力してください。")
+                
+                # 削除ボタン
+                if st.button(f"🗑️ 削除", key=f"delete_{entry['id']}_{idx}"):
+                    if self.diary_manager.delete_diary_entry(entry['id']):
+                        st.success("削除しました")
+                        st.rerun()
     
     def show_stats(self) -> None:
         st.title("📊 統計情報")
-        user_id = st.session_state.get('user_id')
-        diary_data = self._get_user_diary_data(user_id)
+        diary_data = self._get_user_diary_data()
+        if not diary_data:
+            st.info("まだ日記がありません。新しい日記を書いてみましょう！")
+            return
         trends = self.ai_analyzer.analyze_trends(diary_data)
         if trends:
             col1, col2 = st.columns(2)
@@ -432,10 +423,9 @@ class UIComponents:
                 start_str = start_date.strftime('%Y-%m-%d')
                 end_str = end_date.strftime('%Y-%m-%d')
                 
-                user_id = st.session_state.get('user_id')
-                all_data = self._get_user_diary_data(user_id)
+                diary_data = self._get_user_diary_data()
                 period_data = [
-                    entry for entry in all_data 
+                    entry for entry in diary_data 
                     if start_str <= entry.get('date', '') <= end_str
                 ]
                 
@@ -734,4 +724,8 @@ class UIComponents:
                 st.error(f"エクスポートエラー: {str(e)}")
                 st.exception(e)
     
+    def show_emotion(self) -> None:
+        st.title("🎭 感情分析")
+        st.info("感情分析機能は今後実装予定です。")
+
  
