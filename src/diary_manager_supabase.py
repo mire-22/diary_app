@@ -17,7 +17,7 @@ class DiaryManagerSupabase:
     def get_current_user_id(self) -> Optional[str]:
         """現在のユーザーIDを取得"""
         user = self.supabase.get_current_user()
-        return user.get('id') if user else None
+        return getattr(user, 'id', None) if user else None
     
     def create_diary_entry(self, text: str, entry_date: date, question: str = None) -> Optional[str]:
         """日記エントリを作成"""
